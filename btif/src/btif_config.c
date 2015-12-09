@@ -410,6 +410,7 @@ static void btif_config_devcache_cleanup(void) {
   static const size_t ADDRS_MAX = 512;
   size_t total_addrs = 0;
 
+
   pthread_mutex_lock(&lock);
   const config_section_node_t *snode = config_section_begin(config);
   while (snode != config_section_end(config)) {
