@@ -261,6 +261,58 @@ tBTA_STATUS BTA_DmHciRawCommand (UINT16 opcode, UINT8 param_len,
 
 /*******************************************************************************
 **
+** Function         BTA_DmVendorSpecificCommand
+**
+** Description      This function sends the vendor specific command
+**                  to the controller
+**
+**
+** Returns          tBTA_STATUS
+**
+*******************************************************************************/
+tBTA_STATUS BTA_DmVendorSpecificCommand (UINT16 opcode, UINT8 param_len,
+                                         UINT8 *p_param_buf,
+                                         tBTA_VENDOR_CMPL_CBACK *p_cback)
+{
+
+    tBTA_DM_API_VENDOR_SPECIFIC_COMMAND    *p_msg;
+    UINT16 size;
+
+    /* If p_cback is NULL, Notify application */
+    if (p_cback == NULL)
+    {
+        return (BTA_FAILURE);
+    }
+    else
+    {
+        size = sizeof (tBTA_DM_API_VENDOR_SPECIFIC_COMMAND) + param_len;
+        if ((p_msg = (tBTA_DM_API_VENDOR_SPECIFIC_COMMAND *) GKI_getbuf(size)) != NULL)
+        {
+            p_msg->hdr.event = BTA_DM_API_VENDOR_SPECIFIC_COMMAND_EVT;
+            p_msg->opcode = opcode;
+            p_msg->p_param_buf = (UINT8 *)(p_msg + 1);
+            p_msg->p_cback = p_cback;
+
+            if (p_param_buf && param_len)
+            {
+                memcpy (p_msg->p_param_buf, p_param_buf, param_len);
+                p_msg->param_len = param_len;
+            }
+            else
+            {
+                p_msg->param_len = 0;
+                p_msg->p_param_buf = NULL;
+
+            }
+
+            bta_sys_sendmsg(p_msg);
+        }
+        return (BTA_SUCCESS);
+    }
+}
+
+/*******************************************************************************
+**
 ** Function         BTA_DmSearch
 **
 ** Description      This function searches for peer Bluetooth devices. It performs
@@ -956,6 +1008,7 @@ void BTA_DmSetBlePrefConnParams(BD_ADDR bd_addr,
 *******************************************************************************/
 void BTA_DmSetBleConnScanParams(UINT32 scan_interval, UINT32 scan_window)
 {
+#if BTA_GATT_INCLUDED == TRUE
     tBTA_DM_API_BLE_SCAN_PARAMS  *p_msg;
     if ((p_msg = (tBTA_DM_API_BLE_SCAN_PARAMS *)GKI_getbuf(sizeof(tBTA_DM_API_BLE_SCAN_PARAMS))) != NULL)
     {
@@ -965,8 +1018,9 @@ void BTA_DmSetBleConnScanParams(UINT32 scan_interval, UINT32 scan_window)
         p_msg->scan_window      = scan_window;
         bta_sys_sendmsg(p_msg);
     }
+#endif
 }
-
+#if BTA_GATT_INCLUDED == TRUE
 /*******************************************************************************
 **
 ** Function         BTA_DmSetBleScanParams
@@ -1001,7 +1055,7 @@ void BTA_DmSetBleScanParams(tGATT_IF client_if, UINT32 scan_interval,
         bta_sys_sendmsg(p_msg);
     }
 }
-
+#endif
 /*******************************************************************************
 **
 ** Function         BTA_DmSetBleAdvParams
