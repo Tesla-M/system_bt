@@ -41,13 +41,17 @@
 #include "dyn_mem.h"    /* defines static and/or dynamic memory for components */
 
 //------------------Added from bdroid_buildcfg.h---------------------
+#ifndef I2SPCM_SLAVE_BRCM
+#define I2SPCM_SLAVE_BRCM FALSE
+#endif
+
 #ifndef L2CAP_EXTFEA_SUPPORTED_MASK
 #define L2CAP_EXTFEA_SUPPORTED_MASK (L2CAP_EXTFEA_ENH_RETRANS | L2CAP_EXTFEA_STREAM_MODE | L2CAP_EXTFEA_NO_CRC | L2CAP_EXTFEA_FIXED_CHNLS)
 #endif
 
 /* This feature is used to update any QCOM related changes in the stack*/
 #ifndef BLUETOOTH_QTI_SW
-#define BLUETOOTH_QTI_SW TRUE
+#define BLUETOOTH_QTI_SW FALSE
 #endif
 
 #ifndef BTUI_OPS_FORMATS
@@ -220,7 +224,7 @@
 ******************************************************************************/
 
 #ifndef TEST_APP_INTERFACE
-#define TEST_APP_INTERFACE           TRUE
+#define TEST_APP_INTERFACE           FALSE
 #endif
 
 /******************************************************************************
@@ -1666,7 +1670,7 @@ Range: 2 octets
 #endif
 
 #ifndef SDP_AVRCP_1_5
-#define SDP_AVRCP_1_5               TRUE
+#define SDP_AVRCP_1_5               FALSE
 
 #if  SDP_AVRCP_1_5    == TRUE
 #ifndef AVCT_BROWSE_INCLUDED

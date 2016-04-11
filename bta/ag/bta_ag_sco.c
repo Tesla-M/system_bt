@@ -288,12 +288,11 @@ static void bta_ag_sco_disc_cback(UINT16 sco_idx)
                      bta_ag_cb.sco.p_curr_scb->codec_msbc_settings = BTA_AG_SCO_MSBC_SETTINGS_T1;
                 }
                 else
-#else
+#endif
                 {
                     APPL_TRACE_DEBUG("Fallback to CVSD settings");
                     bta_ag_cb.sco.p_curr_scb->codec_fallback = TRUE;
                 }
-#endif
             }
         }
 
@@ -631,6 +630,13 @@ static void bta_ag_create_sco(tBTA_AG_SCB *p_scb, BOOLEAN is_orig)
         sco_route = bta_dm_sco_co_init(pcm_sample_rate, pcm_sample_rate, &codec_info, p_scb->app_id);
 #endif
 
+
+#if (I2SPCM_SLAVE_BRCM == TRUE )
+        /* Configure I2SPCM slave path */
+        UINT8 cmd_buf[4] = { 0, 0, 0, 1 };
+        BTM_VendorSpecificCommand(109, 4, (UINT8 *)&cmd_buf, 0);
+        BTM_WriteVoiceSettings (BTM_VOICE_SETTING_CVSD);
+#endif
 
 #if (BTM_SCO_HCI_INCLUDED == TRUE )
         /* initialize SCO setup, no voice setting for AG, data rate <==> sample rate */

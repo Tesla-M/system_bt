@@ -19,6 +19,10 @@ LOCAL_SRC_FILES := \
     src/packet_fragmenter.c \
     src/vendor.c
 
+ifeq ($(BOARD_HAVE_BLUETOOTH_BCM),true)
+LOCAL_CFLAGS += -DBOARD_HAVE_BLUETOOTH_BCM
+endif
+
 ifeq ($(BLUETOOTH_HCI_USE_MCT),true)
 LOCAL_CFLAGS += -DHCI_USE_MCT
 endif
@@ -27,7 +31,7 @@ ifeq ($(QCOM_BT_USE_SMD_TTY),true)
 LOCAL_CFLAGS += -DQCOM_WCN_SSR
 endif
 
-ifeq ($(TARGET_BUILD_VARIANT), userdebug)
+ifeq ($(TARGET_BUILD_VARIANT), eng)
     LOCAL_CFLAGS += -DBTSNOOP_DEFAULT=TRUE
 endif
 

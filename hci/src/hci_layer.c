@@ -483,14 +483,23 @@ static void event_command_ready(fixed_queue_t *queue, UNUSED_ATTR void *context)
     // Move it to the list of commands awaiting response
     pthread_mutex_lock(&commands_pending_response_lock);
     list_append(commands_pending_response, wait_entry);
+
+    non_repeating_timer_restart_if(command_response_timer, !list_is_empty(commands_pending_response));
     pthread_mutex_unlock(&commands_pending_response_lock);
 
     // Send it off
+#ifdef BOARD_HAVE_BLUETOOTH_BCM
+    low_power_manager->wake_assert();
+#else
     low_power_manager->stop_idle_timer();
+#endif
     packet_fragmenter->fragment_and_dispatch(wait_entry->command);
+#ifdef BOARD_HAVE_BLUETOOTH_BCM
+    low_power_manager->transmit_done();
+#else
     low_power_manager->start_idle_timer(false);
+#endif
 
-    non_repeating_timer_restart_if(command_response_timer, !list_is_empty(commands_pending_response));
   }
 }
 
@@ -735,7 +744,9 @@ static bool filter_incoming_event(BT_HDR *packet) {
 
   return false;
 intercepted:;
+  pthread_mutex_lock(&commands_pending_response_lock);
   non_repeating_timer_restart_if(command_response_timer, !list_is_empty(commands_pending_response));
+  pthread_mutex_unlock(&commands_pending_response_lock);
 
   if (wait_entry) {
     // If it has a callback, it's responsible for freeing the packet

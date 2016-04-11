@@ -34,6 +34,7 @@
 #include <system/audio.h>
 #include "hardware/bt_av.h"
 #include "osi/include/allocator.h"
+#include <cutils/properties.h>
 
 #define LOG_TAG "bt_btif_av"
 
@@ -101,6 +102,9 @@ typedef struct
     int service;
     BOOLEAN is_slave;
     BOOLEAN is_device_playing;
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+    UINT16 channel_id;
+#endif
 } btif_av_cb_t;
 
 typedef struct
@@ -363,6 +367,8 @@ static void btif_report_audio_state(btav_audio_state_t state, bt_bdaddr_t *bd_ad
 
 static BOOLEAN btif_av_state_idle_handler(btif_sm_event_t event, void *p_data, int index)
 {
+    char a2dp_role[PROPERTY_VALUE_MAX] = "false";
+
     BTIF_TRACE_IMP("%s event:%s flags %x on Index = %d", __FUNCTION__,
                      dump_av_sm_event_name(event), btif_av_cb[index].flags, index);
 
@@ -381,6 +387,17 @@ static BOOLEAN btif_av_state_idle_handler(btif_sm_event_t event, void *p_data, i
             for (int i = 0; i < btif_max_av_clients; i++)
             {
                 btif_av_cb[i].dual_handoff = FALSE;
+            }
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+            btif_av_cb[index].channel_id = 0;
+#endif
+            property_get("persist.service.bt.a2dp.sink", a2dp_role, "false");
+            if (!strncmp("false", a2dp_role, 5)) {
+                btif_av_cb[index].peer_sep = AVDT_TSEP_SNK;
+                btif_a2dp_set_peer_sep(AVDT_TSEP_SNK);
+            } else {
+                btif_av_cb[index].peer_sep = AVDT_TSEP_SRC;
+                btif_a2dp_set_peer_sep(AVDT_TSEP_SRC);
             }
             /* This API will be called twice at initialization
             ** Idle can be moved when device is disconnected too.
@@ -535,6 +552,11 @@ static BOOLEAN btif_av_state_idle_handler(btif_sm_event_t event, void *p_data, i
                  }
 
                  bdcpy(btif_av_cb[index].peer_bda.address, ((tBTA_AV*)p_data)->open.bd_addr);
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+                 btif_av_cb[index].channel_id = p_bta_data->open.stream_chnl_id;
+                 BTIF_TRACE_DEBUG("streaming channel id updated as : 0x%x",
+                    btif_av_cb[index].channel_id);
+#endif
             }
             else
             {
@@ -663,6 +685,11 @@ static BOOLEAN btif_av_state_opening_handler(btif_sm_event_t event, void *p_data
                      BTIF_TRACE_DEBUG("remote supports 3 mbps");
                      btif_av_cb[index].edr_3mbps = TRUE;
                  }
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+                 btif_av_cb[index].channel_id = p_bta_data->open.stream_chnl_id;
+                 BTIF_TRACE_DEBUG("streaming channel id updated as : 0x%x",
+                        btif_av_cb[index].channel_id);
+#endif
             }
             else
             {
@@ -1086,7 +1113,7 @@ static BOOLEAN btif_av_state_opened_handler(btif_sm_event_t event, void *p_data,
                     else
                     {
                         BTIF_TRACE_DEBUG("%s: trigger suspend as remote initiated!!",
-                                __FUNCTION__);
+                            __FUNCTION__);
                         btif_dispatch_sm_event(BTIF_AV_SUSPEND_STREAM_REQ_EVT, NULL, 0);
                     }
                 }
@@ -1637,6 +1664,9 @@ static void btif_av_handle_event(UINT16 event, char* p_param)
         case BTIF_AV_STOP_STREAM_REQ_EVT:
         case BTIF_AV_SUSPEND_STREAM_REQ_EVT:
             /*Should be handled by current STARTED*/
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+            btif_media_on_stop_vendor_command();
+#endif
             index = btif_get_latest_playing_device_idx();
             break;
         /*Events from the stack, BTA*/
@@ -3190,3 +3220,59 @@ BOOLEAN btif_av_get_ongoing_multicast()
         return FALSE;
     }
 }
+
+#ifdef BTA_AV_SPLIT_A2DP_ENABLED
+/******************************************************************************
+**
+** Function         btif_av_get_streaming_channel_id
+**
+** Description     Returns streaming channel id
+**
+** Returns          channel id
+********************************************************************************/
+UINT16 btif_av_get_streaming_channel_id(void)
+{
+    btif_sm_state_t state = BTIF_AV_STATE_IDLE;
+    int i;
+    for (i = 0; i < btif_max_av_clients; i++)
+    {
+        state = btif_sm_get_state(btif_av_cb[i].sm_handle);
+        if ((state == BTIF_AV_STATE_OPENED) ||
+            (state == BTIF_AV_STATE_STARTED))
+        {
+            BTIF_TRACE_DEBUG("btif_av_get_streaming_channel_id: %u",
+                    btif_av_cb[i].channel_id);
+            return btif_av_cb[i].channel_id;
+        }
+    }
+    return 0;
+}
+
+/******************************************************************************
+**
+** Function         btif_av_get_peer_addr
+**
+** Description     Returns peer device address
+**
+** Returns          peer address
+********************************************************************************/
+void btif_av_get_peer_addr(bt_bdaddr_t *peer_bda)
+{
+    btif_sm_state_t state = BTIF_AV_STATE_IDLE;
+    int i;
+    memset(peer_bda, 0, sizeof(bt_bdaddr_t));
+    for (i = 0; i < btif_max_av_clients; i++)
+    {
+        state = btif_sm_get_state(btif_av_cb[i].sm_handle);
+        if ((state == BTIF_AV_STATE_OPENED) ||
+            (state == BTIF_AV_STATE_STARTED))
+        {
+            BTIF_TRACE_DEBUG("btif_av_get_peer_addr: %u",
+                    btif_av_cb[i].peer_bda);
+            memcpy(peer_bda, &btif_av_cb[i].peer_bda,
+                                    sizeof(bt_bdaddr_t));
+        }
+    }
+}
+#endif
+

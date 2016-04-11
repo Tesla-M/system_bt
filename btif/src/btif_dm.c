@@ -64,6 +64,7 @@
 ******************************************************************************/
 
 #define COD_UNCLASSIFIED ((0x1F) << 8)
+#define COD_HID_JOYSTICK                    0x0504
 #define COD_HID_KEYBOARD                    0x0540
 #define COD_HID_POINTING                    0x0580
 #define COD_HID_COMBO                       0x05C0
@@ -1037,6 +1038,33 @@ static void btif_dm_pin_req_evt(tBTA_DM_PIN_REQ *p_pin_req)
                 return;
             }
         }
+        else if (check_cod(&bd_addr, COD_HID_JOYSTICK))
+        {
+            if(( btif_storage_is_wiimote (&bd_addr, &bd_name) == TRUE) &&
+                (pairing_cb.autopair_attempts == 0))
+            {
+                bt_bdaddr_t ad_addr;
+                bt_status_t status;
+                bt_property_t prop;
+                prop.type = BT_PROPERTY_BDADDR;
+                prop.val = (void*) &ad_addr;
+
+                status = btif_storage_get_adapter_property(&prop);
+
+                BTIF_TRACE_DEBUG("%s() Attempting auto pair", __FUNCTION__);
+
+                pin_code.pin[0] = ad_addr.address[5];
+                pin_code.pin[1] = ad_addr.address[4];
+                pin_code.pin[2] = ad_addr.address[3];
+                pin_code.pin[3] = ad_addr.address[2];
+                pin_code.pin[4] = ad_addr.address[1];
+                pin_code.pin[5] = ad_addr.address[0];
+
+                pairing_cb.autopair_attempts++;
+                BTA_DmPinReply( (UINT8*)bd_addr.address, TRUE, 6, pin_code.pin);
+                return;
+            }
+        }
     }
     HAL_CBACK(bt_hal_cbacks, pin_request_cb,
                      &bd_addr, &bd_name, cod, p_pin_req->min_16_digit);
@@ -1939,6 +1967,7 @@ static void btif_dm_upstreams_evt(UINT16 event, char* p_param)
             bdcpy(bd_addr.address, p_data->link_up.bd_addr);
             BTIF_TRACE_DEBUG("BTA_DM_LINK_UP_EVT. Sending BT_ACL_STATE_CONNECTED");
 
+#if BLE_INCLUDED == TRUE
             if(p_data->link_up.link_type == BT_TRANSPORT_LE)
             {
                 num_active_le_links++;
@@ -1966,6 +1995,7 @@ static void btif_dm_upstreams_evt(UINT16 event, char* p_param)
                 btif_av_trigger_suspend();
             }
 
+#endif
             btif_update_remote_version_property(&bd_addr);
 
             HAL_CBACK(bt_hal_cbacks, acl_state_changed_cb, BT_STATUS_SUCCESS,
@@ -1976,7 +2006,7 @@ static void btif_dm_upstreams_evt(UINT16 event, char* p_param)
             bdcpy(bd_addr.address, p_data->link_down.bd_addr);
 
             btm_set_bond_type_dev(p_data->link_down.bd_addr, BOND_TYPE_UNKNOWN);
-
+#if BLE_INCLUDED == TRUE
             BTIF_TRACE_DEBUG("BTA_DM_LINK_DOWN_EVT. Sending BT_ACL_STATE_DISCONNECTED");
             if (num_active_le_links > 0 &&
                 p_data->link_down.link_type == BT_TRANSPORT_LE)
@@ -1991,6 +2021,7 @@ static void btif_dm_upstreams_evt(UINT16 event, char* p_param)
                 num_active_br_edr_links--;
                 BTIF_TRACE_DEBUG("num_active_br_edr_links is %d ",num_active_br_edr_links);
             }
+#endif
             btif_av_move_idle(bd_addr);
             BTIF_TRACE_DEBUG("BTA_DM_LINK_DOWN_EVT. Sending BT_ACL_STATE_DISCONNECTED");
             HAL_CBACK(bt_hal_cbacks, acl_state_changed_cb, BT_STATUS_SUCCESS,
@@ -2868,10 +2899,10 @@ bt_status_t btif_dm_get_remote_services_by_transport(bt_bdaddr_t *remote_addr, c
     mask_ext.num_uuid = 0;
     mask_ext.p_uuid = NULL;
     mask_ext.srvc_mask = BTA_ALL_SERVICE_MASK;
-
+#if BLE_INCLUDED == TRUE
     BTA_DmDiscoverByTransport(remote_addr->address, &mask_ext,
                    bte_dm_search_services_evt, TRUE, transport);
-
+#endif
     return BT_STATUS_SUCCESS;
 }
 
