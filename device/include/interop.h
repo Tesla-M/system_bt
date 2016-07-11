@@ -22,11 +22,13 @@
 
 #include "btcore/include/bdaddr.h"
 
+static const char INTEROP_MODULE[] = "interop_module";
+
 typedef enum {
   // Disable secure connections
   // This is for pre BT 4.1/2 devices that do not handle secure mode
   // very well.
-  INTEROP_DISABLE_LE_SECURE_CONNECTIONS,
+  INTEROP_DISABLE_LE_SECURE_CONNECTIONS = 0,
 
   // Some devices have proven problematic during the pairing process, often
   // requiring multiple retries to complete pairing. To avoid degrading the user
@@ -58,6 +60,10 @@ typedef enum {
   //Few carkits take long time to start sending AT commands
   //Increase AG_CONN TIMEOUT so that AG connection go through
   INTEROP_INCREASE_AG_CONN_TIMEOUT,
+  // Devices requiring this workaround do not handle Bluetooth Absolute Volume
+  // control correctly, leading to undesirable (potentially harmful) volume levels
+  // or general lack of controlability.
+  INTEROP_DISABLE_ABSOLUTE_VOLUME
 } interop_feature_t;
 
 // Check if a given |addr| matches a known interoperability workaround as identified
@@ -76,3 +82,13 @@ bool interop_name_match(const interop_feature_t feature, const char *addr);
 // where more information is not available.
 bool interop_manufacturer_match(const interop_feature_t feature, uint16_t manufacturer);
 
+// are performed on |addr|.
+bool interop_match(const interop_feature_t feature, const bt_bdaddr_t *addr);
+
+// Add a dynamic interop database entry for a device matching the first |length| bytes
+// of |addr|, implementing the workaround identified by |feature|. |addr| may not be
+// null and |length| must be greater than 0 and less than sizeof(bt_bdaddr_t).
+void interop_database_add(const interop_feature_t feature, const bt_bdaddr_t *addr, size_t length);
+
+// Clear the dynamic portion of the interoperability workaround database.
+void interop_database_clear(void);
