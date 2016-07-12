@@ -40,7 +40,9 @@
 #include "btif_common.h"
 #include "btif_util.h"
 #include "btif_av.h"
+#include "device/include/interop.h"
 #include "hardware/bt_rc.h"
+#include "device/include/interop.h"
 #include "uinput.h"
 #include "bdaddr.h"
 
